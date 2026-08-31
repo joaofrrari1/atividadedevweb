@@ -1,0 +1,1228 @@
+openapi: 3.0.3
+info:
+  title: API de Gestão de Estoque - DDA Metalúrgica
+  description: |
+    Contrato da API do Sistema de Gestão de Estoque da DDA Metalúrgica,
+    elaborado seguindo a abordagem API First.
+  version: 1.0.0
+  contact:
+    name: Equipe do Projeto Integrador - UniSENAI
+servers:
+  - url: http://localhost:8080/api
+    description: Ambiente local de desenvolvimento
+
+tags:
+  - name: Autenticação
+  - name: Itens
+  - name: Categorias
+  - name: Fornecedores
+  - name: Movimentações
+  - name: Estoque
+  - name: Alertas
+  - name: Usuários
+  - name: Relatórios
+
+paths:
+  /auth/login:
+    post:
+      tags: [Autenticação]
+      summary: Autentica um usuário
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: operador@dda.com.br
+              senha: "123456"
+      responses:
+        '200':
+          description: Login realizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Credenciais inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /itens:
+    get:
+      tags: [Itens]
+      summary: Lista itens do estoque
+      operationId: listarItens
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - name: codigo
+          in: query
+          schema:
+            type: string
+          description: Filtra pelo código do item.
+        - name: nome
+          in: query
+          schema:
+            type: string
+          description: Filtra pela descrição/nome do item.
+        - name: categoriaId
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Filtra pelo identificador da categoria.
+        - name: fornecedorId
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Filtra pelo identificador do fornecedor.
+        - name: estoqueBaixo
+          in: query
+          schema:
+            type: boolean
+          description: Quando true, retorna itens cuja quantidade disponível está no estoque mínimo ou abaixo dele.
+      responses:
+        '200':
+          description: Lista de itens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageItemResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Itens]
+      summary: Cadastra um item
+      operationId: criarItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemRequest'
+            example:
+              codigo: MAT-001
+              nome: Chapa de aço carbono
+              descricao: Chapa de aço carbono para produção
+              unidadeMedida: UN
+              quantidadeAtual: 50
+              estoqueMinimo: 10
+              categoriaId: 1
+              fornecedorId: 1
+      responses:
+        '201':
+          description: Item criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Código do item já cadastrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /itens/{itemId}:
+    get:
+      tags: [Itens]
+      summary: Consulta um item pelo identificador
+      operationId: buscarItem
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          description: Item encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Itens]
+      summary: Atualiza um item
+      operationId: atualizarItem
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemRequest'
+      responses:
+        '200':
+          description: Item atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Itens]
+      summary: Exclui um item
+      operationId: excluirItem
+      parameters:
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '204':
+          description: Item excluído com sucesso
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Item não pode ser excluído porque possui movimentações associadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /categorias:
+    get:
+      tags: [Categorias]
+      summary: Lista categorias
+      operationId: listarCategorias
+      responses:
+        '200':
+          description: Lista de categorias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoriaResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Categorias]
+      summary: Cadastra uma categoria
+      operationId: criarCategoria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoriaRequest'
+            example:
+              nome: Matéria-prima
+              descricao: Materiais utilizados diretamente na produção
+      responses:
+        '201':
+          description: Categoria criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriaResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Categoria já cadastrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /categorias/{categoriaId}:
+    put:
+      tags: [Categorias]
+      summary: Atualiza uma categoria
+      operationId: atualizarCategoria
+      parameters:
+        - $ref: '#/components/parameters/CategoriaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoriaRequest'
+      responses:
+        '200':
+          description: Categoria atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriaResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Categorias]
+      summary: Exclui uma categoria
+      operationId: excluirCategoria
+      parameters:
+        - $ref: '#/components/parameters/CategoriaId'
+      responses:
+        '204':
+          description: Categoria excluída com sucesso
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Categoria possui itens vinculados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /fornecedores:
+    get:
+      tags: [Fornecedores]
+      summary: Lista fornecedores
+      operationId: listarFornecedores
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - name: nome
+          in: query
+          schema:
+            type: string
+          description: Filtra pelo nome ou razão social.
+      responses:
+        '200':
+          description: Lista de fornecedores
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageFornecedorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Fornecedores]
+      summary: Cadastra um fornecedor
+      operationId: criarFornecedor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FornecedorRequest'
+            example:
+              nome: Aço Sul Ltda.
+              documento: "12345678000199"
+              email: contato@acosul.com.br
+              telefone: "48999999999"
+              endereco: Rua Industrial, 100
+      responses:
+        '201':
+          description: Fornecedor criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FornecedorResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Fornecedor já cadastrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /fornecedores/{fornecedorId}:
+    put:
+      tags: [Fornecedores]
+      summary: Atualiza um fornecedor
+      operationId: atualizarFornecedor
+      parameters:
+        - $ref: '#/components/parameters/FornecedorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FornecedorRequest'
+      responses:
+        '200':
+          description: Fornecedor atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FornecedorResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Fornecedores]
+      summary: Exclui um fornecedor
+      operationId: excluirFornecedor
+      parameters:
+        - $ref: '#/components/parameters/FornecedorId'
+      responses:
+        '204':
+          description: Fornecedor excluído com sucesso
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Fornecedor possui itens vinculados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /movimentacoes:
+    get:
+      tags: [Movimentações]
+      summary: Consulta o histórico de movimentações
+      operationId: listarMovimentacoes
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - name: itemId
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Filtra pelo item movimentado.
+        - name: tipo
+          in: query
+          schema:
+            $ref: '#/components/schemas/TipoMovimentacao'
+          description: Filtra por entrada ou saída.
+        - name: dataInicio
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Data inicial do período.
+        - name: dataFim
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Data final do período.
+        - name: usuarioId
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Filtra pelo usuário responsável.
+      responses:
+        '200':
+          description: Histórico de movimentações
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageMovimentacaoResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Movimentações]
+      summary: Registra uma entrada ou saída de estoque
+      operationId: criarMovimentacao
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovimentacaoRequest'
+            examples:
+              entrada:
+                summary: Entrada de material
+                value:
+                  itemId: 1
+                  tipo: ENTRADA
+                  quantidade: 25
+                  motivo: Compra de matéria-prima
+              saida:
+                summary: Saída de material
+                value:
+                  itemId: 1
+                  tipo: SAIDA
+                  quantidade: 5
+                  motivo: Utilização na produção
+      responses:
+        '201':
+          description: Movimentação registrada e saldo atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovimentacaoResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Quantidade insuficiente para realizar a saída
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /movimentacoes/{movimentacaoId}:
+    get:
+      tags: [Movimentações]
+      summary: Consulta uma movimentação
+      operationId: buscarMovimentacao
+      parameters:
+        - $ref: '#/components/parameters/MovimentacaoId'
+      responses:
+        '200':
+          description: Movimentação encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovimentacaoResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /estoque:
+    get:
+      tags: [Estoque]
+      summary: Consulta o estoque atual
+      operationId: consultarEstoque
+      parameters:
+        - name: codigo
+          in: query
+          schema:
+            type: string
+        - name: nome
+          in: query
+          schema:
+            type: string
+        - name: categoriaId
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: fornecedorId
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: estoqueBaixo
+          in: query
+          schema:
+            type: boolean
+          description: Retorna somente itens no estoque mínimo ou abaixo dele.
+      responses:
+        '200':
+          description: Situação atual do estoque
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EstoqueResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /alertas/estoque-minimo:
+    get:
+      tags: [Alertas]
+      summary: Lista itens que atingiram ou estão abaixo do estoque mínimo
+      operationId: listarAlertasEstoqueMinimo
+      responses:
+        '200':
+          description: Alertas de estoque mínimo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlertaEstoqueResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /usuarios:
+    get:
+      tags: [Usuários]
+      summary: Lista usuários do sistema
+      operationId: listarUsuarios
+      responses:
+        '200':
+          description: Lista de usuários
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UsuarioResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Usuários]
+      summary: Cadastra um usuário
+      operationId: criarUsuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioRequest'
+            example:
+              nome: João da Silva
+              email: joao@dda.com.br
+              senha: "123456"
+              perfil: OPERADOR
+      responses:
+        '201':
+          description: Usuário criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: E-mail já cadastrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /usuarios/{usuarioId}:
+    put:
+      tags: [Usuários]
+      summary: Atualiza um usuário
+      operationId: atualizarUsuario
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioUpdateRequest'
+      responses:
+        '200':
+          description: Usuário atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Usuários]
+      summary: Exclui um usuário
+      operationId: excluirUsuario
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+      responses:
+        '204':
+          description: Usuário excluído com sucesso
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Usuário possui movimentações associadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /relatorios/estoque:
+    get:
+      tags: [Relatórios]
+      summary: Gera relatório de situação do estoque
+      operationId: relatorioEstoque
+      parameters:
+        - name: categoriaId
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: fornecedorId
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: estoqueBaixo
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Dados consolidados do estoque
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatorioEstoqueResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /relatorios/movimentacoes:
+    get:
+      tags: [Relatórios]
+      summary: Gera relatório de entradas e saídas
+      operationId: relatorioMovimentacoes
+      parameters:
+        - name: dataInicio
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: dataFim
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: tipo
+          in: query
+          schema:
+            $ref: '#/components/schemas/TipoMovimentacao'
+        - name: itemId
+          in: query
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Dados consolidados das movimentações
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatorioMovimentacoesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Número da página, iniciando em 0.
+    Size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Quantidade de registros por página.
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    CategoriaId:
+      name: categoriaId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    FornecedorId:
+      name: fornecedorId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    MovimentacaoId:
+      name: movimentacaoId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    UsuarioId:
+      name: usuarioId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+
+  responses:
+    BadRequest:
+      description: Dados inválidos ou parâmetros incorretos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Autenticação necessária ou token inválido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, senha]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 150
+        senha:
+          type: string
+          minLength: 6
+          maxLength: 100
+
+    LoginResponse:
+      type: object
+      required: [token, usuario]
+      properties:
+        token:
+          type: string
+          description: Token JWT utilizado para autenticar as requisições.
+        usuario:
+          $ref: '#/components/schemas/UsuarioResponse'
+
+    ItemRequest:
+      type: object
+      required:
+        - codigo
+        - nome
+        - unidadeMedida
+        - quantidadeAtual
+        - estoqueMinimo
+        - categoriaId
+        - fornecedorId
+      properties:
+        codigo:
+          type: string
+          minLength: 1
+          maxLength: 50
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 150
+        descricao:
+          type: string
+          maxLength: 500
+        unidadeMedida:
+          type: string
+          minLength: 1
+          maxLength: 20
+          example: UN
+        quantidadeAtual:
+          type: number
+          format: double
+          minimum: 0
+        estoqueMinimo:
+          type: number
+          format: double
+          minimum: 0
+        categoriaId:
+          type: integer
+          format: int64
+          minimum: 1
+        fornecedorId:
+          type: integer
+          format: int64
+          minimum: 1
+
+    ItemResponse:
+      allOf:
+        - $ref: '#/components/schemas/ItemRequest'
+        - type: object
+          required: [id, criadoEm, atualizadoEm]
+          properties:
+            id:
+              type: integer
+              format: int64
+            criadoEm:
+              type: string
+              format: date-time
+            atualizadoEm:
+              type: string
+              format: date-time
+
+    CategoriaRequest:
+      type: object
+      required: [nome]
+      properties:
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 100
+        descricao:
+          type: string
+          maxLength: 300
+
+    CategoriaResponse:
+      allOf:
+        - $ref: '#/components/schemas/CategoriaRequest'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: integer
+              format: int64
+
+    FornecedorRequest:
+      type: object
+      required: [nome]
+      properties:
+        nome:
+          type: string
+          minLength: 1
+          maxLength: 150
+        documento:
+          type: string
+          minLength: 11
+          maxLength: 18
+          description: CPF ou CNPJ, conforme o tipo de fornecedor.
+        email:
+          type: string
+          format: email
+          maxLength: 150
+        telefone:
+          type: string
+          maxLength: 20
+        endereco:
+          type: string
+          maxLength: 300
+
+    FornecedorResponse:
+      allOf:
+        - $ref: '#/components/schemas/FornecedorRequest'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: integer
+              format: int64
+
+    TipoMovimentacao:
+      type: string
+      enum: [ENTRADA, SAIDA]
+
+    MovimentacaoRequest:
+      type: object
+      required: [itemId, tipo, quantidade]
+      properties:
+        itemId:
+          type: integer
+          format: int64
+          minimum: 1
+        tipo:
+          $ref: '#/components/schemas/TipoMovimentacao'
+        quantidade:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+        motivo:
+          type: string
+          maxLength: 300
+
+    MovimentacaoResponse:
+      type: object
+      required:
+        - id
+        - itemId
+        - tipo
+        - quantidade
+        - saldoAnterior
+        - saldoAtual
+        - usuarioId
+        - dataHora
+      properties:
+        id:
+          type: integer
+          format: int64
+        itemId:
+          type: integer
+          format: int64
+        tipo:
+          $ref: '#/components/schemas/TipoMovimentacao'
+        quantidade:
+          type: number
+          format: double
+        saldoAnterior:
+          type: number
+          format: double
+        saldoAtual:
+          type: number
+          format: double
+        motivo:
+          type: string
+        usuarioId:
+          type: integer
+          format: int64
+        dataHora:
+          type: string
+          format: date-time
+
+    EstoqueResponse:
+      type: object
+      required: [itemId, codigo, nome, quantidadeAtual, estoqueMinimo, situacao]
+      properties:
+        itemId:
+          type: integer
+          format: int64
+        codigo:
+          type: string
+        nome:
+          type: string
+        quantidadeAtual:
+          type: number
+          format: double
+        estoqueMinimo:
+          type: number
+          format: double
+        situacao:
+          type: string
+          enum: [NORMAL, ESTOQUE_MINIMO, ESTOQUE_BAIXO]
+
+    AlertaEstoqueResponse:
+      type: object
+      required: [itemId, codigo, nome, quantidadeAtual, estoqueMinimo]
+      properties:
+        itemId:
+          type: integer
+          format: int64
+        codigo:
+          type: string
+        nome:
+          type: string
+        quantidadeAtual:
+          type: number
+          format: double
+        estoqueMinimo:
+          type: number
+          format: double
+        diferenca:
+          type: number
+          format: double
+          description: Diferença entre o estoque atual e o estoque mínimo.
+
+    UsuarioRequest:
+      type: object
+      required: [nome, email, senha, perfil]
+      properties:
+        nome:
+          type: string
+          minLength: 2
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          maxLength: 150
+        senha:
+          type: string
+          minLength: 6
+          maxLength: 100
+        perfil:
+          type: string
+          minLength: 1
+          maxLength: 50
+          example: OPERADOR
+
+    UsuarioUpdateRequest:
+      type: object
+      required: [nome, email, perfil]
+      properties:
+        nome:
+          type: string
+          minLength: 2
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          maxLength: 150
+        senha:
+          type: string
+          minLength: 6
+          maxLength: 100
+        perfil:
+          type: string
+          minLength: 1
+          maxLength: 50
+
+    UsuarioResponse:
+      type: object
+      required: [id, nome, email, perfil]
+      properties:
+        id:
+          type: integer
+          format: int64
+        nome:
+          type: string
+        email:
+          type: string
+          format: email
+        perfil:
+          type: string
+
+    RelatorioEstoqueResponse:
+      type: object
+      required: [totalItens, itensAbaixoDoMinimo, quantidadeTotalEmEstoque, itens]
+      properties:
+        totalItens:
+          type: integer
+          format: int64
+        itensAbaixoDoMinimo:
+          type: integer
+          format: int64
+        quantidadeTotalEmEstoque:
+          type: number
+          format: double
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/EstoqueResponse'
+
+    RelatorioMovimentacoesResponse:
+      type: object
+      required: [dataInicio, dataFim, totalEntradas, totalSaidas, movimentacoes]
+      properties:
+        dataInicio:
+          type: string
+          format: date
+        dataFim:
+          type: string
+          format: date
+        totalEntradas:
+          type: number
+          format: double
+        totalSaidas:
+          type: number
+          format: double
+        movimentacoes:
+          type: array
+          items:
+            $ref: '#/components/schemas/MovimentacaoResponse'
+
+    PageItemResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemResponse'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+
+    PageFornecedorResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/FornecedorResponse'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+
+    PageMovimentacaoResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/MovimentacaoResponse'
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      required: [status, mensagem]
+      properties:
+        status:
+          type: integer
+          example: 400
+        mensagem:
+          type: string
+          example: Dados informados são inválidos.
+        erros:
+          type: array
+          items:
+            type: string
+
+security:
+  - bearerAuth: []
